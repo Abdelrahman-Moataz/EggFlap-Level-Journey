@@ -1,9 +1,11 @@
 
-export interface UserProfile {
+export interface UserData {
   uid: string;
   email: string;
+  displayName: string;
+  avatarColor: string;
   currentLevel: number;
-  highestLevelUnlocked: number;
+  unlockedLevels: number;
   totalEggs: number;
   unlockedCharacters: string[];
   selectedCharacterId: string;
@@ -12,26 +14,36 @@ export interface UserProfile {
 export interface Character {
   id: string;
   name: string;
-  iconName: string;
   color: string;
-  cost: number;
+  price: number;
+  iconName: string;
 }
 
 export interface LevelConfig {
   id: number;
-  backgroundColor: string;
+  bgColor: string;
   pipeColor: string;
   speed: number;
   gapSize: number;
-  pipeFrequency: number;
-  eggsToSpawn: number;
+  pipesToPass: number;
+  eggProbability: number;
 }
 
-export enum GameState {
-  MENU,
-  MAP,
-  PLAYING,
-  GAMEOVER,
-  SHOP,
-  LEVEL_COMPLETE
+export enum ScreenType {
+  SPLASH = 'SPLASH',
+  AUTH = 'AUTH',
+  MAIN_MENU = 'MAIN_MENU',
+  LEVEL_MAP = 'LEVEL_MAP',
+  GAME = 'GAME',
+  SHOP = 'SHOP',
+  PROFILE = 'PROFILE'
+}
+
+export interface PipeData {
+  x: number;
+  topHeight: number;
+  passed: boolean;
+  hasEgg: boolean;
+  eggY: number;
+  eggCollected: boolean;
 }

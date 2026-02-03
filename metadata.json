@@ -1,7 +1,5 @@
 {
-  "name": "EggFlap: Level Journey",
-  "description": "A progressive Flappy Bird-style adventure with 30 levels, a Candy Crush-style map, character shop, and egg economy.",
-  "version": "1.0.0",
-  "repository": "github",
+  "name": "EggQuest: Flappy Adventure",
+  "description": "A progressive level-based Flappy Bird clone with a Candy Crush-style map, character shop, and egg economy.",
   "requestFramePermissions": []
 }

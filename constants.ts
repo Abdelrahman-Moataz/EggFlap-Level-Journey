@@ -1,37 +1,47 @@
 
 import { Character, LevelConfig } from './types';
 
-export const BIRD_SIZE = 36;
-export const GRAVITY = 0.6;
-export const JUMP_FORCE = -8;
-export const PIPE_WIDTH = 60;
+export const TOTAL_LEVELS = 30;
 
 export const CHARACTERS: Character[] = [
-  { id: 'bird-1', name: 'Original Blue', iconName: 'Bird', color: '#60A5FA', cost: 0 },
-  { id: 'bird-2', name: 'Fire Phoenix', iconName: 'Flame', color: '#F87171', cost: 50 },
-  { id: 'bird-3', name: 'Ghost Flyer', iconName: 'Ghost', color: '#E5E7EB', cost: 150 },
-  { id: 'bird-4', name: 'Emerald Wing', iconName: 'Zap', color: '#34D399', cost: 300 },
-  { id: 'bird-5', name: 'Golden King', iconName: 'Crown', color: '#FBBF24', cost: 1000 },
+  { id: 'bird_1', name: 'Original', color: '#fbbf24', price: 0, iconName: 'Bird' },
+  { id: 'bird_2', name: 'Bluey', color: '#60a5fa', price: 50, iconName: 'Bird' },
+  { id: 'bird_3', name: 'Rosie', color: '#f472b6', price: 150, iconName: 'Bird' },
+  { id: 'bird_4', name: 'Emerald', color: '#34d399', price: 300, iconName: 'Bird' },
+  { id: 'bird_5', name: 'Shadow', color: '#4b5563', price: 500, iconName: 'Bird' },
+];
+
+const BG_COLORS = [
+  '#0ea5e9', '#38bdf8', '#0284c7', // Blues
+  '#f59e0b', '#fbbf24', '#d97706', // Yellows
+  '#10b981', '#34d399', '#059669', // Greens
+  '#8b5cf6', '#a78bfa', '#7c3aed', // Purples
+];
+
+const PIPE_COLORS = [
+  '#166534', '#15803d', '#14532d', // Deep greens
+  '#9a3412', '#c2410c', '#7c2d12', // Rust reds
+  '#1e3a8a', '#1e40af', '#172554', // Deep blues
 ];
 
 export const generateLevels = (): LevelConfig[] => {
-  const levels: LevelConfig[] = [];
-  const baseColors = ['#87CEEB', '#98FB98', '#FFB6C1', '#DDA0DD', '#F0E68C'];
-  const pipeColors = ['#228B22', '#556B2F', '#8B4513', '#483D8B', '#2F4F4F'];
-
-  for (let i = 1; i <= 30; i++) {
-    const difficultyFactor = i / 30;
-    levels.push({
-      id: i,
-      backgroundColor: baseColors[i % baseColors.length],
-      pipeColor: pipeColors[i % pipeColors.length],
-      speed: 2 + (difficultyFactor * 3.5),
-      gapSize: 180 - (difficultyFactor * 60),
-      pipeFrequency: 1800 - (difficultyFactor * 600),
-      eggsToSpawn: 2 + Math.floor(i / 5),
-    });
-  }
-  return levels;
+  return Array.from({ length: TOTAL_LEVELS }, (_, i) => {
+    const levelNum = i + 1;
+    // Difficulty curve
+    const speed = 3 + (levelNum * 0.15); // Starts at 3.15, ends at 7.5
+    const gapSize = Math.max(160, 260 - (levelNum * 3.5)); // Starts at 256.5, ends at 155
+    const pipesToPass = 5 + Math.floor(levelNum / 2); // 5 to 20 pipes
+    
+    return {
+      id: levelNum,
+      bgColor: BG_COLORS[i % BG_COLORS.length],
+      pipeColor: PIPE_COLORS[i % PIPE_COLORS.length],
+      speed,
+      gapSize,
+      pipesToPass,
+      eggProbability: 0.3 + (levelNum * 0.01), // Increases slightly
+    };
+  });
 };
 
 export const LEVELS = generateLevels();
