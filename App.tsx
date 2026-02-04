@@ -13,7 +13,8 @@ import {
   CheckCircle2,
   Cloud,
   CloudUpload,
-  RefreshCw
+  RefreshCw,
+  AlertTriangle
 } from 'lucide-react';
 import { UserData, ScreenType } from './types';
 import { CHARACTERS, LEVELS, TOTAL_LEVELS } from './constants';
@@ -34,6 +35,7 @@ const App: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
+  const [initializationError, setInitializationError] = useState<string | null>(null);
 
   // Profile Edit State
   const [tempName, setTempName] = useState('');
@@ -41,9 +43,24 @@ const App: React.FC = () => {
   const [isSavingProfile, setIsSavingProfile] = useState(false);
 
   useEffect(() => {
+    // Hide the custom HTML loader once React starts
+    const loader = document.getElementById('loading-screen');
+    if (loader) loader.style.display = 'none';
+
     let isMounted = true;
+    
+    // Safety timeout: If Firebase doesn't respond in 10 seconds, show an error
+    const timer = setTimeout(() => {
+      if (isAuthChecking && isMounted) {
+        setInitializationError("Firebase Connection Timeout. Verify your Internet and Console settings.");
+        setIsAuthChecking(false);
+      }
+    }, 10000);
+
     const unsubscribe = authService.onStateChanged(async (fbUser) => {
       if (!isMounted) return;
+      clearTimeout(timer);
+      
       if (fbUser) {
         try {
           let userData = await firestoreService.getUserData(fbUser.uid);
@@ -54,9 +71,9 @@ const App: React.FC = () => {
             setUser(userData);
             setScreen(ScreenType.LEVEL_MAP);
           }
-        } catch (err) {
+        } catch (err: any) {
           console.error("Auth Data Error:", err);
-          if (isMounted) setAuthError("Sync Failed.");
+          if (isMounted) setInitializationError(`Cloud Sync Error: ${err.message}`);
         } finally {
           if (isMounted) setIsAuthChecking(false);
         }
@@ -68,7 +85,12 @@ const App: React.FC = () => {
         }
       }
     });
-    return () => { isMounted = false; unsubscribe(); };
+
+    return () => { 
+      isMounted = false; 
+      unsubscribe(); 
+      clearTimeout(timer);
+    };
   }, []);
 
   const handleAuth = async (e: React.FormEvent) => {
@@ -79,7 +101,7 @@ const App: React.FC = () => {
     try {
       await authService.loginOrRegister(email, password);
     } catch (err: any) {
-      setAuthError(err.message || "Auth Error.");
+      setAuthError(err.message || "Authentication failed.");
       setIsLoading(false);
     }
   };
@@ -136,7 +158,7 @@ const App: React.FC = () => {
     setTimeout(() => setScreen(ScreenType.LEVEL_MAP), 1500);
   };
 
-  // 1. SPLASH
+  // 1. SPLASH / LOADING
   if (isAuthChecking || screen === ScreenType.SPLASH) {
     return (
       <div className="h-screen w-full bg-sky-500 flex flex-col items-center justify-center p-8 overflow-hidden relative">
@@ -144,6 +166,30 @@ const App: React.FC = () => {
           <BirdIcon size={64} className="text-yellow-900" />
         </div>
         <h1 className="mt-8 text-white font-game text-7xl text-center leading-tight drop-shadow-lg">EGG<br/>QUEST</h1>
+        
+        {initializationError ? (
+          <div className="mt-12 bg-white/20 backdrop-blur-md p-6 rounded-[2rem] border border-white/30 max-w-xs text-center shadow-xl">
+            <AlertTriangle className="text-red-300 mx-auto mb-3" size={32} />
+            <p className="text-white font-bold text-sm uppercase tracking-widest leading-relaxed mb-4">
+              {initializationError}
+            </p>
+            <button 
+              onClick={() => window.location.reload()}
+              className="w-full bg-white text-sky-600 px-6 py-3 rounded-xl font-game text-sm shadow-lg active:scale-95 transition-transform"
+            >
+              RETRY CONNECTION
+            </button>
+          </div>
+        ) : (
+          <div className="mt-12 flex flex-col items-center gap-3">
+            <div className="flex gap-1">
+              <div className="w-2 h-2 bg-white rounded-full animate-bounce [animation-delay:-0.3s]"></div>
+              <div className="w-2 h-2 bg-white rounded-full animate-bounce [animation-delay:-0.15s]"></div>
+              <div className="w-2 h-2 bg-white rounded-full animate-bounce"></div>
+            </div>
+            <p className="text-white/60 font-bold text-[10px] uppercase tracking-[0.4em]">Checking Pilot Credentials</p>
+          </div>
+        )}
       </div>
     );
   }
@@ -157,9 +203,10 @@ const App: React.FC = () => {
           <form onSubmit={handleAuth} className="space-y-4">
             <input type="email" value={email} onChange={e => setEmail(e.target.value)} className="w-full px-4 py-4 bg-slate-50 border-2 border-slate-100 rounded-2xl font-bold" placeholder="Email" required />
             <input type="password" value={password} onChange={e => setPassword(e.target.value)} className="w-full px-4 py-4 bg-slate-50 border-2 border-slate-100 rounded-2xl font-bold" placeholder="Password" required />
-            {authError && <p className="text-red-500 text-xs font-bold text-center">{authError}</p>}
-            <Button onClick={() => {}} className="w-full py-5 text-2xl" disabled={isLoading}>{isLoading ? 'LOADING...' : 'START'}</Button>
+            {authError && <p className="text-red-500 text-xs font-bold text-center bg-red-50 p-2 rounded-lg">{authError}</p>}
+            <Button onClick={() => {}} className="w-full py-5 text-2xl" disabled={isLoading}>{isLoading ? 'VALIDATING...' : 'START ADVENTURE'}</Button>
           </form>
+          <p className="text-center text-slate-400 text-[10px] font-bold uppercase tracking-widest mt-6">Secure Login via Firebase</p>
         </div>
       </div>
     );
@@ -171,8 +218,8 @@ const App: React.FC = () => {
       <div className="h-screen w-full bg-slate-100 flex flex-col overflow-hidden relative">
         <div className="bg-white/90 backdrop-blur-md border-b-4 border-slate-200 p-4 flex justify-between items-center z-20 sticky top-0">
           <div className="flex items-center gap-3">
-            <button onClick={() => { setTempName(user?.displayName || ''); setTempColor(user?.avatarColor || ''); setScreen(ScreenType.PROFILE); }} className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-2xl flex items-center justify-center border-b-4 border-black/10 shadow-lg" style={{ backgroundColor: user?.avatarColor }}>
+            <button onClick={() => { setTempName(user?.displayName || ''); setTempColor(user?.avatarColor || ''); setScreen(ScreenType.PROFILE); }} className="flex items-center gap-3 group">
+              <div className="w-12 h-12 rounded-2xl flex items-center justify-center border-b-4 border-black/10 shadow-lg transition-transform group-active:scale-95" style={{ backgroundColor: user?.avatarColor }}>
                 <BirdIcon size={24} className="text-white" />
               </div>
               <div className="text-left">
@@ -194,7 +241,7 @@ const App: React.FC = () => {
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-8 flex flex-col-reverse items-center gap-16 pb-32">
+        <div className="flex-1 overflow-y-auto p-8 flex flex-col-reverse items-center gap-16 pb-32 scroll-smooth">
           {LEVELS.map((level, idx) => {
             const isUnlocked = level.id <= (user?.unlockedLevels || 1);
             const isCurrent = level.id === (user?.unlockedLevels || 1);
@@ -204,7 +251,7 @@ const App: React.FC = () => {
                 <button
                   disabled={!isUnlocked}
                   onClick={() => { updateUserData({ currentLevel: level.id }); setScreen(ScreenType.GAME); }}
-                  className={`w-20 h-20 rounded-[1.75rem] flex items-center justify-center transition-all ${isUnlocked ? 'shadow-[0_8px_0_0_rgba(0,0,0,0.1)] active:shadow-none active:translate-y-[8px]' : 'opacity-40 grayscale'} ${isCurrent ? 'bg-sky-500 border-4 border-white animate-bounce-subtle' : isUnlocked ? 'bg-emerald-500 border-4 border-white' : 'bg-slate-400 border-4 border-slate-300'}`}
+                  className={`w-20 h-20 rounded-[1.75rem] flex items-center justify-center transition-all ${isUnlocked ? 'shadow-[0_8px_0_0_rgba(0,0,0,0.1)] active:shadow-none active:translate-y-[8px]' : 'opacity-40 grayscale cursor-not-allowed'} ${isCurrent ? 'bg-sky-500 border-4 border-white animate-bounce-subtle' : isUnlocked ? 'bg-emerald-500 border-4 border-white hover:scale-105' : 'bg-slate-400 border-4 border-slate-300'}`}
                 >
                   {isUnlocked ? <span className="text-white font-game text-3xl">{level.id}</span> : <Lock className="text-white/50" size={28} />}
                 </button>
@@ -213,10 +260,10 @@ const App: React.FC = () => {
           })}
         </div>
 
-        <div className="bg-white border-t-4 border-slate-200 p-4 flex justify-around items-center sticky bottom-0 z-50">
+        <div className="bg-white border-t-4 border-slate-200 p-4 flex justify-around items-center sticky bottom-0 z-50 shadow-up">
           <button className="flex flex-col items-center gap-1 text-sky-600"><MapIcon size={24} /><span className="text-[10px] font-bold uppercase tracking-widest">Map</span></button>
-          <button onClick={() => setScreen(ScreenType.SHOP)} className="flex flex-col items-center gap-1 text-slate-400"><ShoppingBag size={24} /><span className="text-[10px] font-bold uppercase tracking-widest">Shop</span></button>
-          <button onClick={() => authService.logout()} className="flex flex-col items-center gap-1 text-slate-400"><LogOut size={24} /><span className="text-[10px] font-bold uppercase tracking-widest">Exit</span></button>
+          <button onClick={() => setScreen(ScreenType.SHOP)} className="flex flex-col items-center gap-1 text-slate-400 hover:text-slate-600"><ShoppingBag size={24} /><span className="text-[10px] font-bold uppercase tracking-widest">Shop</span></button>
+          <button onClick={() => authService.logout()} className="flex flex-col items-center gap-1 text-slate-400 hover:text-red-400"><LogOut size={24} /><span className="text-[10px] font-bold uppercase tracking-widest">Exit</span></button>
         </div>
       </div>
     );
@@ -227,7 +274,7 @@ const App: React.FC = () => {
     return (
       <div className="h-screen w-full bg-white flex flex-col">
         <div className="p-6 border-b-4 border-slate-100 flex items-center justify-between">
-          <button onClick={() => setScreen(ScreenType.LEVEL_MAP)} className="p-3 bg-slate-100 rounded-2xl"><ChevronLeft size={24} /></button>
+          <button onClick={() => setScreen(ScreenType.LEVEL_MAP)} className="p-3 bg-slate-100 rounded-2xl hover:bg-slate-200 transition-colors"><ChevronLeft size={24} /></button>
           <h2 className="font-game text-3xl">Profile</h2>
           <div className="w-12"></div>
         </div>
@@ -240,13 +287,13 @@ const App: React.FC = () => {
           </div>
           <div className="space-y-2 text-left">
             <label className="text-xs font-bold text-slate-500 uppercase tracking-widest ml-1">Pilot Name</label>
-            <input type="text" value={tempName} onChange={e => setTempName(e.target.value)} className="w-full px-6 py-5 bg-slate-50 border-2 border-slate-100 rounded-[1.5rem] font-bold text-xl focus:border-sky-400 outline-none" maxLength={15} />
+            <input type="text" value={tempName} onChange={e => setTempName(e.target.value)} className="w-full px-6 py-5 bg-slate-50 border-2 border-slate-100 rounded-[1.5rem] font-bold text-xl focus:border-sky-400 outline-none transition-all" maxLength={15} />
           </div>
           <div className="space-y-4">
             <label className="text-xs font-bold text-slate-500 uppercase tracking-widest block text-left ml-1">Signature Color</label>
             <div className="grid grid-cols-4 gap-3">
               {AVATAR_COLORS.map(c => (
-                <button key={c} onClick={() => setTempColor(c)} className={`aspect-square rounded-2xl border-4 transition-all ${tempColor === c ? 'border-sky-400 scale-110 shadow-lg' : 'border-transparent'}`} style={{ backgroundColor: c }} />
+                <button key={c} onClick={() => setTempColor(c)} className={`aspect-square rounded-2xl border-4 transition-all ${tempColor === c ? 'border-sky-400 scale-110 shadow-lg' : 'border-transparent hover:scale-105'}`} style={{ backgroundColor: c }} />
               ))}
             </div>
           </div>
@@ -283,7 +330,7 @@ const App: React.FC = () => {
                   <div className="flex-1 text-left"><h3 className="font-game text-2xl text-slate-800">{char.name}</h3></div>
                   <div className="mt-1">
                     {isUnlocked ? (
-                      <button onClick={() => updateUserData({ selectedCharacterId: char.id })} disabled={isSelected} className={`px-6 py-3 rounded-2xl font-game ${isSelected ? 'text-sky-500 bg-white' : 'bg-sky-500 text-white'}`}>{isSelected ? 'ACTIVE' : 'SELECT'}</button>
+                      <button onClick={() => updateUserData({ selectedCharacterId: char.id })} disabled={isSelected} className={`px-6 py-3 rounded-2xl font-game ${isSelected ? 'text-sky-500 bg-white' : 'bg-sky-500 text-white hover:bg-sky-600'}`}>{isSelected ? 'ACTIVE' : 'SELECT'}</button>
                     ) : (
                       <button onClick={() => {
                         if (canAfford) {
@@ -292,7 +339,7 @@ const App: React.FC = () => {
                             unlockedCharacters: [...(user?.unlockedCharacters || []), char.id] 
                           });
                         }
-                      }} disabled={!canAfford} className={`px-6 py-3 rounded-2xl font-game flex items-center gap-2 ${canAfford ? 'bg-yellow-400' : 'bg-slate-200 text-slate-400'}`}><EggIcon size={16}/> {char.price}</button>
+                      }} disabled={!canAfford} className={`px-6 py-3 rounded-2xl font-game flex items-center gap-2 transition-all ${canAfford ? 'bg-yellow-400 hover:bg-yellow-500 active:scale-95' : 'bg-slate-200 text-slate-400 cursor-not-allowed'}`}><EggIcon size={16}/> {char.price}</button>
                     )}
                   </div>
                 </div>
